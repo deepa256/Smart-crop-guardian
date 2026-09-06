@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Crop Guardian Box - Live Dashboard</title>
+    <!-- Firebase SDK Scripts for Real-time Connection -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: #0f172a; color: #f8fafc; padding: 20px; }
+        header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #334155; padding-bottom: 15px; }
+        header h1 { color: #22c55e; font-size: 28px; }
+        header p { color: #94a3b8; font-size: 14px; margin-top: 5px; }
+        
+        .status-bar { text-align: center; margin-bottom: 25px; font-weight: bold; }
+        .online-tag { background: #166534; color: #4ade80; padding: 6px 16px; border-radius: 20px; font-size: 14px; }
+        
+        .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; max-width: 1000px; margin: 0 auto; }
+        .card { background: #1e293b; padding: 25px; border-radius: 16px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.3); border: 1px solid #334155; text-align: center; }
+        .card h3 { color: #94a3b8; font-size: 16px; font-weight: 500; margin-bottom: 15px; }
+        .card .value { font-size: 36px; font-weight: bold; color: #38bdf8; margin-bottom: 10px; }
+        
+        /* Alert Box Styles */
+        .alert-card.normal { border-left: 6px solid #22c55e; }
+        .alert-card.danger { border-left: 6px solid #ef4444; background: #3f1718; }
+        .alert-text-normal { color: #22c55e !important; }
+        .alert-text-danger { color: #ef4444 !important; }
+
+        /* Control Toggle Switch */
+        .btn { background: #22c55e; color: #000; font-weight: bold; border: none; padding: 12px 30px; font-size: 18px; border-radius: 8px; cursor: pointer; transition: 0.3s; }
+        .btn-off { background: #ef4444; color: #fff; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>🌱 Smart Crop Guardian Box</h1>
+        <p>Real-Time Agricultural Monitoring & Threat Defense System</p>
+    </header>
+
+    <div class="status-bar">
+        <span class="online-tag">● Hardware Status: Live Connected</span>
+    </div>
+
+    <div class="dashboard-grid">
+        <!-- Card 1: Soil Moisture -->
+        <div class="card">
+            <h3>SOIL MOISTURE</h3>
+            <div class="value" id="soil-val">-- %</div>
+            <p id="soil-status" style="color: #94a3b8; font-size: 12px;">Waiting for Hardware...</p>
+        </div>
+
+        <!-- Card 2: Animal Intrusion Detection -->
+        <div class="card alert-card normal" id="intrusion-card">
+            <h3>ANIMAL INTRUSION (PIR)</h3>
+            <div class="value alert-text-normal" id="intrusion-val">SAFE</div>
+            <p style="color: #94a3b8; font-size: 12px;">Field Perimeter Clear</p>
+        </div>
+
+        <!-- Card 3: Water Pump Remote Control -->
+        <div class="card">
+            <h3>IRRIGATION PUMP CONTROL</h3>
+            <div class="value" id="pump-status" style="font-size: 20px; margin-bottom: 20px; color: #f59e0b;">PUMP OFF</div>
+            <button class="btn" id="pump-btn" onclick="togglePump()">TURN PUMP ON</button>
+        </div>
+    </div>
+
+    <script>
+        // Real-time Database Config (இதை Step 3-ல் Firebase உருவாக்கும் போது மாற்றுவோம்)
+        const firebaseConfig = {
+            databaseURL: "https://YOUR-PROJECT-NAME-default-rtdb.firebaseio.com/"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        // 1. Live Soil Moisture Listener
+        db.ref('/Sensor/SoilMoisture').on('value', (snapshot) => {
+            const val = snapshot.val() || 0;
+            document.getElementById('soil-val').innerText = val + "%";
+            document.getElementById('soil-status').innerText = val < 30 ? "Status: Dry Soil (Needs Water)" : "Status: Optimal Moisture";
+        });
+
+        // 2. Live PIR Motion Intrusion Listener
+        db.ref('/Sensor/Intrusion').on('value', (snapshot) => {
+            const isDetected = snapshot.val(); // true or false
+            const card = document.getElementById('intrusion-card');
+            const text = document.getElementById('intrusion-val');
+
+            if (isDetected === true || isDetected === "DETECTED") {
+                card.className = "card alert-card danger";
+                text.className = "value alert-text-danger";
+                text.innerText = "🚨 ANIMAL DETECTED!";
+            } else {
+                card.className = "card alert-card normal";
+                text.className = "value alert-text-normal";
+                text.innerText = "SAFE";
+            }
+        });
+
+        // 3. Remote Control Water Pump Switch
+        let currentPumpState = false;
+        function togglePump() {
+            currentPumpState = !currentPumpState;
+            db.ref('/Control/Pump').set(currentPumpState);
+        }
+
+        db.ref('/Control/Pump').on('value', (snapshot) => {
+            currentPumpState = snapshot.val();
+            const btn = document.getElementById('pump-btn');
+            const status = document.getElementById('pump-status');
+
+            if (currentPumpState) {
+                status.innerText = "PUMP RUNNING";
+                status.style.color = "#22c55e";
+                btn.innerText = "TURN PUMP OFF";
+                btn.className = "btn btn-off";
+            } else {
+                status.innerText = "PUMP OFF";
+                status.style.color = "#f59e0b";
+                btn.innerText = "TURN PUMP ON";
+                btn.className = "btn";
+            }
+        });
+    </script>
+</body>
+</html>
